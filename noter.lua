@@ -6,7 +6,7 @@ local config = import("micro/config")
 local os = import("os")
 local buffer = import("micro/buffer")
 
-function init()
+function init() -- [[README]]
   -- by default, don't open link in new tab
   config.RegisterGlobalOption(PLUGIN, "openinnewtab", false)
 
@@ -27,8 +27,10 @@ end
 -- open wikilink command logic
 function wikilink(bp)
   -- check markdown only setting
-  if (bp.Settings["filetype"] ~= "markdown") and 
-    (config.GetGlobalOption(PLUGIN..".markdownonly")) then return
+  if (bp.Buf.Settings["filetype"] ~= "markdown") and 
+  (config.GetGlobalOption(PLUGIN..".markdownonly")) then
+    micro.InfoBar():Message(PLUGIN..": current filetype not md (see option "..PLUGIN..".markdownonly)")
+    return
   end
 
   -- get wikilink text
