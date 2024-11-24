@@ -1,7 +1,7 @@
 # noter
 
-A plugin for the micro text editor providing a set of features for wiki-style 
-markdown notes.
+A plugin for the [micro text editor](https://github.com/zyedidia/micro) 
+providing a set of features for wiki-style markdown notes.
 
 This plugin is a bit opinionated in its current design, as it's built around how
 I personally take markdown notes.
