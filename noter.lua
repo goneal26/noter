@@ -30,10 +30,8 @@ function wikilink(bp)
   -- try to open a buffer
   local _, filenotfound = os.Stat(path)
   if filenotfound then -- prompt to create new note
-    micro.InfoBar():YNPrompt("Create note "..path.."? (y,n,esc) ", 
-      new_note(path))
-  else
-    open_note(path)
+    micro.InfoBar():YNPrompt("Create "..path.."? (y,n,esc) ", new_note(path))
+    else open_note(path) 
   end
 end
 
