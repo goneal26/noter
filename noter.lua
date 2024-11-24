@@ -1,78 +1,86 @@
 VERSION = "0.1.0"
+PLUGIN = "noter"
 
 local micro = import("micro")
 local config = import("micro/config")
 local os = import("os")
 local buffer = import("micro/buffer")
 
--- add wikilink command 
 function init()
-  config.MakeCommand("wikilink", wikilink_text, config.NoComplete)
-  config.TryBindKey("Alt-y", "command:wikilink", false)
+  -- by default, don't open link in new tab
+  config.RegisterGlobalOption(PLUGIN, "openinnewtab", false)
+  config.MakeCommand("wikilink", wikilink, config.NoComplete)
 end
 
--- log text inside of a [[wikilink]] at the cursor
-function wikilink_text(bp)
-  local line = bp.Buf:Line(bp.Cursor.Loc.Y) -- get line as string
-  if line == "" or line == nil then return nil end -- ignore empty lines
+-- log text inside of a [[testy]] at the cursor [[README]]
+function wikilink(bp)
+  local linktext = link_under_cursor(bp)
+  if not linktext then return end
 
-  local innertext = extract_path(line, bp.Cursor.Loc.X)
+  -- TODO this probably won't work on windows
+  local current_dir = bp.Buf.Path:match("^(.-)/[^/]+$")
+  local path
+  if not current_dir then path = linktext..".md"
+    else path = current_dir.."/"..linktext..".md" 
+  end
+  -- NOTE assume link is to a markdown file
   
-  if not innertext or innertext == "" then 
-    micro.InfoBar():Message("got: nil")
-  else 
-    local current_dir = bp.Buf.Path:match("^(.-)/[^/]+$")
-    
-    local path
-    if not current_dir then path = innertext..".md"
-      else path = current_dir.."/"..innertext..".md"
-    end
-    
-    bp:Save()
-    try_open(path, bp)
+  bp:Save() -- save before opening
+  
+  -- try to open a buffer
+  local _, filenotfound = os.Stat(path)
+  if filenotfound then -- prompt to create new note
+    micro.InfoBar():YNPrompt("Create note "..path.."? (y,n,esc) ", 
+      new_note(path))
+  else
+    open_note(path)
   end
 end
 
--- test with [[README]]
-function try_open(filepath, bp)
-  local info, err = os.Stat(filepath)
-  if os.IsNotExist(err) or info:IsDir() then 
-    micro.InfoBar():Message("no file found: " .. filepath)
-  else -- file exists, open it
-    local buff, err = buffer.NewBufferFromFile(filepath)
-    if err then 
-      micro.InfoBar():Message("Error opening file")
-      return
-    else
-      bp:OpenBuffer(buff) -- TODO option to open in new tab?
-    end
-  end
+-- returns a callback function that creates a new note at the path
+function new_note(path)
+  micro.InfoBar():Reset()
+  return (function(y, esc)
+    if esc or (not y) then return else open_note(path) end
+  end)
 end
 
--- given a string (line in file) get the inner text of the [[wikilink]] at index
+-- opens note at path
+function open_note(path)
+  local bp = micro.CurPane()
+  local b, err = buffer.NewBufferFromFile(path)
+  
+  if config.GetGlobalOption(PLUGIN..".openinnewtab") then 
+    bp:AddTab()
+    bp:NextTab()
+  end
+  
+  if not err then micro.CurPane():OpenBuffer(b) end
+  micro.InfoBar():Message("Opened note "..path)
+end
+
+-- get the inner text of the [[wikilink]] at the cursor's position as a string
 -- inner text will be trimmed of leading/trailing whitespace
--- if not a wikilink or no inner text, returns nil
-function extract_path(line, index)
+-- if cursor is not on a wikilink, or the wikilink is empty, returns nil
+function link_under_cursor(bp)
+  local line = bp.Buf:Line(bp.Cursor.Loc.Y) -- get line cursor is on
+  if not line then return nil end -- return nil if empty line
+  local index = bp.Cursor.Loc.X -- get cursor position in line
+
   -- nearest opening brackets before or at index
   local opening_start, opening_end
   for start, finish in line:gmatch("()%[%[()") do
-    if start <= index then
-      opening_start, opening_end = start, finish
-    else
-      break
+    if start <= index then opening_start, opening_end = start, finish 
+      else break
     end
   end
-
-  -- return nil if no opening brackets found before index
   if not opening_start then return nil end
 
   -- nearest closing brackets after the index
   local closing_start, closing_end = line:find("%]%]", opening_end)
-
-  -- return nil if no closing brackets found after index
   if not closing_start or closing_start < index then return nil end
 
-  -- return the content between the brackets
-  local path = line:sub(opening_end, closing_start - 1)
-  return (path:match("^%s*(.-)%s*$")) -- trims leading and trailing whitespace
+  -- grab the content between the brackets
+  local text = line:sub(opening_end, closing_start - 1)
+  return (text:match("^%s*(.-)%s*$")) -- trims leading/trailing whitespace
 end
