@@ -2,28 +2,46 @@ VERSION = "0.1.0"
 
 local micro = import("micro")
 local config = import("micro/config")
-local util = import("micro/util")
+local os = import("os")
 local buffer = import("micro/buffer")
 
+-- add wikilink command 
 function init()
-  config.MakeCommand("tt", wikilink_text, config.NoComplete)
-  config.TryBindKey("Alt-y", "command:tt", false)
+  config.MakeCommand("wikilink", wikilink_text, config.NoComplete)
+  config.TryBindKey("Alt-y", "command:wikilink", false)
 end
 
--- log text inside of a [[wikilink]] at the cursor 
+-- log text inside of a [[wikilink]] at the cursor
 function wikilink_text(bp)
-  bp:Save() -- is this needed?
-  
   local line = bp.Buf:Line(bp.Cursor.Loc.Y) -- get line as string
-  if line == "" or line == nil then return nil end
+  if line == "" or line == nil then return nil end -- ignore empty lines
 
-  local link_text = extract_path(line, bp.Cursor.Loc.X)
-
+  local innertext = extract_path(line, bp.Cursor.Loc.X)
+  
   -- TODO just log it for now, later open file at that path
-  if not link_text or link_text == "" then 
+  if not innertext or innertext == "" then 
     micro.InfoBar():Message("got: nil")
   else 
-    micro.InfoBar():Message("got: <"..link_text..">")
+    local current_dir = bp.Buf.Path:match("^(.-)/[^/]+$") or "/"
+    local path = current_dir .. "/" .. innertext .. ".md"
+    bp:Save()
+    try_open(path, bp)
+  end
+end
+
+-- test with [[README]]
+function try_open(filepath, bp)
+  local info, err = os.Stat(filepath)
+  if os.IsNotExist(err) or info:IsDir() then 
+    micro.InfoBar():Message("file does not exist or is directory")
+  else -- file exists, open it
+    local buff, err = buffer.NewBufferFromFile(filepath)
+    if err then 
+      micro.InfoBar():Message("Error opening file")
+      return
+    else
+      bp:OpenBuffer(buff) -- TODO option to open in new tab?
+    end
   end
 end
 
