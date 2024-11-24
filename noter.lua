@@ -1,10 +1,18 @@
-VERSION = "1.0.0"
+VERSION = "1.1.0-nightly"
 PLUGIN = "noter"
 
 local micro = import("micro")
 local config = import("micro/config")
 local os = import("os")
 local buffer = import("micro/buffer")
+
+-- a stack that holds all of the links the user has gone to 
+linkstack = {}
+function pushlink(path) table.insert(linkstack, path) end
+function poplink()
+  if #linkstack <= 0 then return nil 
+  else return table.remove(linkstack, #linkstack) end
+end
 
 function init() -- [[README]]
   -- by default, don't open link in new tab
@@ -15,9 +23,14 @@ function init() -- [[README]]
 
   -- registering commands
   config.MakeCommand("wikilink", wikilink, config.NoComplete)
+  config.MakeCommand("back", go_back, config.NoComplete)
 
-  -- tries binding to Alt-o by default (TODO support for double-click?)
+  -- tries binding wikilink Alt-o by default (TODO support for double-click?)
   local _, err = config.TryBindKey("Alt-o", "command:wikilink", false)
+  if err then micro.InfoBar():Error(PLUGIN..": "..err) end
+
+  -- tries binding back to Alt-< by default (TODO will probably change)
+  local _, err = config.TryBindKey("Alt-<", "command:back", false)
   if err then micro.InfoBar():Error(PLUGIN..": "..err) end
 
   -- adding help files
@@ -59,6 +72,28 @@ function wikilink(bp)
   else open_note(path) end
 end
 
+-- go back to previous note in stack
+function go_back(bp)
+  bp:Save() -- TODO if not saved, prompt to save?
+
+  local prev_path = poplink()
+  if not prev_path then
+    micro.InfoBar():Error(PLUGIN..": Cannot go back, previous path not found.")
+    return
+  end
+
+  -- NOTE we're assuming that the previous note did, in fact, exist
+  -- TODO rework for better use of tabs
+  local b, err = buffer.NewBufferFromFile(prev_path)
+  if err then 
+    micro.InfoBar():Error(PLUGIN..": "..err)
+    return
+  end
+  
+  micro.CurPane():OpenBuffer(b)
+  micro.InfoBar():Message(PLUGIN..": went back to "..prev_path)
+end
+
 -- returns a callback function that creates a new note at the path
 function new_note(path)
   micro.InfoBar():Reset()
@@ -80,6 +115,10 @@ function open_note(path)
     micro.InfoBar():Error(PLUGIN..": "..err)
     return
   end
+
+  -- before opening new note, push current path to linkstack
+  local currentpath = micro.CurPane().Buf.Path
+  if currentpath then pushlink(currentpath) end
 
   micro.CurPane():OpenBuffer(b)
   micro.InfoBar():Message(PLUGIN..": Opened note "..path)
