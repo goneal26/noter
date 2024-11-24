@@ -23,7 +23,7 @@ function init() -- [[README]]
 
   -- registering commands
   config.MakeCommand("wikilink", wikilink, config.NoComplete)
-  config.MakeCommand("back", go_back, config.NoComplete)
+  config.MakeCommand("back", back, config.NoComplete)
 
   -- tries binding wikilink Alt-o by default (TODO support for double-click?)
   local _, err = config.TryBindKey("Alt-o", "command:wikilink", false)
@@ -67,22 +67,39 @@ function wikilink(bp)
   -- try to open a new buffer
   local _, filenotfound = os.Stat(path)
   if filenotfound then -- prompt to create new note
-    local msg = PLUGIN..": Create "..path.."? (y,n,esc) "
+    local msg = PLUGIN..": Create "..path.."? (y,n,esc)"
     micro.InfoBar():YNPrompt(msg, new_note(path))
   else open_note(path) end
 end
 
--- go back to previous note in stack
-function go_back(bp)
-  bp:Save() -- TODO if not saved, prompt to save?
+-- go back to previous note in stack [[nonexistant]]
+function back(bp)
+  if bp.Buf:Modified() then -- prompt to save?
+    local msg = "Save changes to "..bp.Buf.Path.." before going back? (y,n,esc)"
+    micro.InfoBar():YNPrompt(msg, save_then_back(bp.Buf))
+  else
+    go_back()
+  end
+end
 
+-- return callback, save, then go back
+function save_then_back(buff)
+  micro.InfoBar():Reset()
+  return (function(y, esc)
+    if esc then return end
+    if y then buff:Save() end
+    go_back()
+  end)
+end
+
+-- logic for going back to previous note TODO
+function go_back()
   local prev_path = poplink()
   if not prev_path then
     micro.InfoBar():Error(PLUGIN..": Cannot go back, previous path not found.")
     return
   end
-
-  -- NOTE we're assuming that the previous note did, in fact, exist
+  
   -- TODO rework for better use of tabs
   local b, err = buffer.NewBufferFromFile(prev_path)
   if err then 
@@ -91,7 +108,7 @@ function go_back(bp)
   end
   
   micro.CurPane():OpenBuffer(b)
-  micro.InfoBar():Message(PLUGIN..": went back to "..prev_path)
+  micro.InfoBar():Message(PLUGIN..": returned back to "..prev_path)
 end
 
 -- returns a callback function that creates a new note at the path
