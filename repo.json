@@ -1,9 +1,17 @@
 [
   {
     "Name": "noter",
-    "Description": "Commands for markdown wiki-esque note taking",
-    "Tags": ["notes", "markdown"],
+    "Description": "Obsidian-inspired Commands for markdown note-taking",
+    "Tags": ["notes", "markdown", "wiki", "Obsidian"],
     "Website": "https://github.com/goneal26/noter",
-    "Versions": [],
+    "Versions": [
+      {
+        "Version": "1.0.0",
+        "Url": "https://github.com/goneal26/archive/v1.0.0.zip",
+        "Require": {
+          "micro": ">=2.0.0"
+        }
+      },
+    ],
   }
 ]

@@ -1,4 +1,4 @@
-VERSION = "0.1.0"
+VERSION = "1.0.0"
 PLUGIN = "noter"
 
 local micro = import("micro")
@@ -9,61 +9,90 @@ local buffer = import("micro/buffer")
 function init()
   -- by default, don't open link in new tab
   config.RegisterGlobalOption(PLUGIN, "openinnewtab", false)
+
+  -- by default, these commands can only be used in markdown files
+  config.RegisterGlobalOption(PLUGIN, "markdownonly", true)
+
+  -- registering commands
   config.MakeCommand("wikilink", wikilink, config.NoComplete)
+
+  -- tries binding to Alt-o by default (TODO support for double-click?)
+  local _, err = config.TryBindKey("Alt-o", "command:wikilink", false)
+  if err then micro.InfoBar():Error(PLUGIN..": "..err) end
+
+  -- adding help files
+  config.AddRuntimeFile(PLUGIN, config.RTHelp, "help/noter.md")
 end
 
--- log text inside of a [[testy]] at the cursor [[README]]
+-- open wikilink command logic
 function wikilink(bp)
-  local linktext = link_under_cursor(bp)
-  if not linktext then return end
+  -- check markdown only setting
+  if (bp.Settings["filetype"] ~= "markdown") and 
+    (config.GetGlobalOption(PLUGIN..".markdownonly")) then return
+  end
 
+  -- get wikilink text
+  local linktext = link_under_cursor()
+  if not linktext then 
+    micro.InfoBar():Message(PLUGIN..": No wikilink under cursor")
+    return 
+  end
+
+  -- determine filepath based on wikilink text
   -- TODO this probably won't work on windows
   local current_dir = bp.Buf.Path:match("^(.-)/[^/]+$")
   local path
   if not current_dir then path = linktext..".md"
     else path = current_dir.."/"..linktext..".md" 
   end
-  -- NOTE assume link is to a markdown file
+  -- NOTE we assume markdown file
   
-  bp:Save() -- save before opening
+  bp:Save() -- save current buffer before opening note
   
-  -- try to open a buffer
+  -- try to open a new buffer
   local _, filenotfound = os.Stat(path)
   if filenotfound then -- prompt to create new note
-    micro.InfoBar():YNPrompt("Create "..path.."? (y,n,esc) ", new_note(path))
-    else open_note(path) 
-  end
+    local msg = PLUGIN..": Create "..path.."? (y,n,esc) "
+    micro.InfoBar():YNPrompt(msg, new_note(path))
+  else open_note(path) end
 end
 
 -- returns a callback function that creates a new note at the path
 function new_note(path)
   micro.InfoBar():Reset()
-  return (function(y, esc)
+  return (function(y, esc) 
     if esc or (not y) then return else open_note(path) end
   end)
 end
 
 -- opens note at path
 function open_note(path)
-  local bp = micro.CurPane()
   local b, err = buffer.NewBufferFromFile(path)
   
   if config.GetGlobalOption(PLUGIN..".openinnewtab") then 
-    bp:AddTab()
-    bp:NextTab()
+    micro.CurPane():AddTab()
+    micro.CurPane():NextTab()
   end
-  
-  if not err then micro.CurPane():OpenBuffer(b) end
-  micro.InfoBar():Message("Opened note "..path)
+
+  if err then 
+    micro.InfoBar():Error(PLUGIN..": "..err)
+    return
+  end
+
+  micro.CurPane():OpenBuffer(b)
+  micro.InfoBar():Message(PLUGIN..": Opened note "..path)
 end
 
 -- get the inner text of the [[wikilink]] at the cursor's position as a string
 -- inner text will be trimmed of leading/trailing whitespace
 -- if cursor is not on a wikilink, or the wikilink is empty, returns nil
-function link_under_cursor(bp)
-  local line = bp.Buf:Line(bp.Cursor.Loc.Y) -- get line cursor is on
-  if not line then return nil end -- return nil if empty line
-  local index = bp.Cursor.Loc.X -- get cursor position in line
+function link_under_cursor()
+  local bp = micro.CurPane()
+  
+  local line = bp.Buf:Line(bp.Cursor.Loc.Y)
+  if not line then return nil end
+  
+  local index = bp.Cursor.Loc.X
 
   -- nearest opening brackets before or at index
   local opening_start, opening_end
