@@ -18,12 +18,16 @@ function wikilink_text(bp)
 
   local innertext = extract_path(line, bp.Cursor.Loc.X)
   
-  -- TODO just log it for now, later open file at that path
   if not innertext or innertext == "" then 
     micro.InfoBar():Message("got: nil")
   else 
-    local current_dir = bp.Buf.Path:match("^(.-)/[^/]+$") or "/"
-    local path = current_dir .. "/" .. innertext .. ".md"
+    local current_dir = bp.Buf.Path:match("^(.-)/[^/]+$")
+    
+    local path
+    if not current_dir then path = innertext..".md"
+      else path = current_dir.."/"..innertext..".md"
+    end
+    
     bp:Save()
     try_open(path, bp)
   end
@@ -33,7 +37,7 @@ end
 function try_open(filepath, bp)
   local info, err = os.Stat(filepath)
   if os.IsNotExist(err) or info:IsDir() then 
-    micro.InfoBar():Message("file does not exist or is directory")
+    micro.InfoBar():Message("no file found: " .. filepath)
   else -- file exists, open it
     local buff, err = buffer.NewBufferFromFile(filepath)
     if err then 
