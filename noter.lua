@@ -35,6 +35,9 @@ function init() -- [[README]]
 
   -- adding help files
   config.AddRuntimeFile(PLUGIN, config.RTHelp, "help/noter.md")
+
+  -- make sure linkstack is empty
+  linkstack = {}
 end
 
 -- open wikilink command logic
@@ -162,7 +165,7 @@ function link_under_cursor()
   if not opening_start then return nil end
 
   -- nearest closing brackets after the index
-  local closing_start, closing_end = line:find("%]%]", opening_end)
+  local closing_start, _ = line:find("%]%]", opening_end)
   if not closing_start or closing_start < index then return nil end
 
   -- grab the content between the brackets
