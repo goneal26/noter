@@ -22,15 +22,15 @@ function init() -- [[README]]
   config.RegisterGlobalOption(PLUGIN, "markdownonly", true)
 
   -- registering commands
-  config.MakeCommand("wikilink", wikilink, config.NoComplete)
-  config.MakeCommand("back", back, config.NoComplete)
+  config.MakeCommand("openlink", wikilink, config.NoComplete)
+  config.MakeCommand("linkback", back, config.NoComplete)
 
   -- tries binding wikilink Alt-o by default (TODO support for double-click?)
-  local _, err = config.TryBindKey("Alt-o", "command:wikilink", false)
+  local _, err = config.TryBindKey("Alt-Enter", "command:openlink", false)
   if err then micro.InfoBar():Error(PLUGIN..": "..err) end
 
   -- tries binding back to Alt-< by default (TODO will probably change)
-  local _, err = config.TryBindKey("Alt-<", "command:back", false)
+  local _, err = config.TryBindKey("Alt-Left", "command:linkback", false)
   if err then micro.InfoBar():Error(PLUGIN..": "..err) end
 
   -- adding help files
@@ -95,7 +95,7 @@ function save_then_back(buff)
   end)
 end
 
--- logic for going back to previous note TODO
+-- logic for going back to previous note
 function go_back()
   local prev_path = poplink()
   if not prev_path then
